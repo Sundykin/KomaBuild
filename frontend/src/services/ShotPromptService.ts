@@ -76,6 +76,11 @@ export interface PromptGenerationResult {
   error?: string;
 }
 
+export interface ShotPromptGenerationOptions {
+  force?: boolean;
+  shotsSnapshot?: Shot[];
+}
+
 export class ShotPromptService {
   private ctx: import('./CreationContext').CreationContext;
 
@@ -106,7 +111,7 @@ export class ShotPromptService {
     characters: Character[],
     stylePrefix: string = '',
     generateFlags?: { image?: boolean; video?: boolean },
-    options?: { force?: boolean },
+    options?: ShotPromptGenerationOptions,
     styleSnapshot?: StyleSnapshotLike
   ): Promise<{ imagePrompt: string; videoPrompt: string }> {
     const force = options?.force ?? false;
@@ -139,7 +144,7 @@ export class ShotPromptService {
     ]);
     const shotScenes = (allScenes || []).filter(s => (shot.scenes || []).includes(s.id));
     const shotProps = (allProps || []).filter(p => (shot.props || []).includes(p.id));
-    const allEpisodeShots = await this.loadAllEpisodeShots();
+    const allEpisodeShots = options?.shotsSnapshot ?? await this.loadAllEpisodeShots();
 
     // 构建角色引用列表（统一 `@<id> <名称>` 顺序，与 mappingSchemaNote 输出约定一致）
     const characterRefs = shotCharacters
@@ -197,14 +202,14 @@ export class ShotPromptService {
       promises.push(this.generatePromptByType(
         'image', shot, shotCharacters, shotScenes, shotProps,
         characterRefs, sceneRefs, propRefs, resolvedStylePrefix,
-        referenceTable, gridSequenceNotice, shotsSection, referenceBundle,
+        referenceTable, gridSequenceNotice, shotsSection, referenceBundle, allEpisodeShots,
       ));
     }
     if (needVideo) {
       promises.push(this.generatePromptByType(
         'video', shot, shotCharacters, shotScenes, shotProps,
         characterRefs, sceneRefs, propRefs, resolvedStylePrefix,
-        referenceTable, gridSequenceNotice, shotsSection, referenceBundle,
+        referenceTable, gridSequenceNotice, shotsSection, referenceBundle, allEpisodeShots,
       ));
     }
 
@@ -238,12 +243,13 @@ export class ShotPromptService {
     gridSequenceNotice: string,
     shotsSection: string,
     referenceBundle: ShotReferenceBundle,
+    allEpisodeShots?: Shot[],
   ): Promise<string> {
     // 视频路径：按 (duration, videoMode) 选择 5 个新模板之一，附带上下文衔接
     if (type === 'video') {
       return this.generateVideoPrompt(
         shot, shotCharacters, shotScenes, shotProps,
-        referenceTable, gridSequenceNotice, shotsSection, referenceBundle,
+        referenceTable, gridSequenceNotice, shotsSection, referenceBundle, allEpisodeShots,
       );
     }
 
@@ -315,6 +321,7 @@ export class ShotPromptService {
     gridSequenceNotice: string,
     shotsSection: string,
     referenceBundle: ShotReferenceBundle,
+    allEpisodeShots?: Shot[],
   ): Promise<string> {
     const videoMode: ShotVideoMode = shot.videoMode || 'multi-ref';
     const projectSelections = this.ctx.videoPromptDurationSelections;
@@ -324,7 +331,7 @@ export class ShotPromptService {
     const templateKey = selectVideoTemplateKey(shot.duration, videoMode, modeSelections);
 
     // 邻接分镜上下文：按需 load 同剧集的所有分镜，定位 prev2 / prev1 / next
-    const adjacency = await this.loadAdjacentShots(shot);
+    const adjacency = await this.loadAdjacentShots(shot, allEpisodeShots);
 
     // 视频推理模板（multi / firstframe）当前都不消费 {{stylePrefix}}——风格前缀仅由 TTI
     // 终稿模板使用。这里若仍传 stylePrefix 会触发 PromptTemplate 的"未声明变量"告警。
@@ -417,7 +424,7 @@ export class ShotPromptService {
    * 加载邻接分镜上下文（前 2、前 1、后 1）。仅在剧集模式下生效；
    * 没有 episodeId 或读取失败时返回全空，模板会按"无"占位处理。
    */
-  private async loadAdjacentShots(shot: Shot): Promise<{
+  private async loadAdjacentShots(shot: Shot, allShotsOverride?: Shot[]): Promise<{
     prev2?: Shot;
     prev1?: Shot;
     next?: Shot;
@@ -425,11 +432,15 @@ export class ShotPromptService {
     const episodeId = this.ctx.episodeId;
     if (!episodeId) return {};
     let allShots: Shot[] = [];
-    try {
-      allShots = await loadEpisodeShots(this.ctx.projectId, episodeId);
-    } catch (err) {
-      logger.warn('加载邻接分镜失败，按无相邻分镜处理', err);
-      return {};
+    if (allShotsOverride) {
+      allShots = allShotsOverride;
+    } else {
+      try {
+        allShots = await loadEpisodeShots(this.ctx.projectId, episodeId);
+      } catch (err) {
+        logger.warn('加载邻接分镜失败，按无相邻分镜处理', err);
+        return {};
+      }
     }
     const idx = allShots.findIndex(s => s.id === shot.id);
     if (idx < 0) return {};
@@ -461,7 +472,8 @@ export class ShotPromptService {
     shot: Shot,
     characters: Character[],
     stylePrefix: string = '',
-    styleSnapshot?: StyleSnapshotLike
+    styleSnapshot?: StyleSnapshotLike,
+    allShotsOverride?: Shot[],
   ): Promise<string> {
     const resolvedStylePrefix = this.resolveTTIStylePrefix(stylePrefix, styleSnapshot);
 
@@ -504,13 +516,17 @@ export class ShotPromptService {
 
     let storyboardReferenceBundle: ShotReferenceBundle | undefined;
     if (shot.imageMode === 'storyboard') {
-      const allShots = await this.loadAllEpisodeShots();
+      const allShots = allShotsOverride ?? await this.loadAllEpisodeShots();
       storyboardReferenceBundle = buildShotReferenceBundle({
         shot,
         characters: shotCharacters,
         scenes: shotScenes,
         props: shotProps,
         allShots,
+      });
+      logger.info('故事板图片提示词参考集合 bundle 已构建', {
+        shotId: shot.id,
+        summary: summarizeBundle(storyboardReferenceBundle),
       });
       templateVariables.referenceTable = renderShotMentionReferenceTable(storyboardReferenceBundle);
       templateVariables.storyboardContinuityNotice = buildStoryboardContinuityNotice(storyboardReferenceBundle);
@@ -536,6 +552,7 @@ export class ShotPromptService {
     }
     if (storyboardReferenceBundle) {
       cleanedResult = rewriteProviderImageTokensToMentions(cleanedResult, storyboardReferenceBundle);
+      cleanedResult = ensureStoryboardContinuityInPrompt(cleanedResult, storyboardReferenceBundle);
     }
 
     return cleanedResult;
@@ -590,7 +607,7 @@ export class ShotPromptService {
     onProgress?: (current: number, total: number, result: PromptGenerationResult) => void,
     styleSnapshot?: StyleSnapshotLike,
     generateFlags?: { image?: boolean; video?: boolean },
-    options?: { force?: boolean },
+    options?: ShotPromptGenerationOptions,
   ): Promise<PromptGenerationResult[]> {
     const wantsImage = generateFlags?.image ?? true;
     const wantsVideo = generateFlags?.video ?? true;
@@ -606,6 +623,10 @@ export class ShotPromptService {
 
     // 使用 ctx 中已加载的 characters
     const preloadedCharacters = this.ctx.characters;
+    const sharedShotsSnapshot = options?.shotsSnapshot ? [...options.shotsSnapshot] : undefined;
+    const taskOptions: ShotPromptGenerationOptions | undefined = sharedShotsSnapshot
+      ? { ...options, shotsSnapshot: sharedShotsSnapshot }
+      : options;
 
     let completedCount = 0;
     const tasks = shotsToGenerate.map((shot) => async () => {
@@ -613,19 +634,28 @@ export class ShotPromptService {
         shot,
         stylePrefix,
         generateFlags,
-        options,
+        taskOptions,
         styleSnapshot,
         preloadedCharacters,
       );
+      if (sharedShotsSnapshot && result.success) {
+        const index = sharedShotsSnapshot.findIndex(item => item.id === result.shotId);
+        if (index >= 0) {
+          sharedShotsSnapshot[index] = {
+            ...sharedShotsSnapshot[index],
+            ...(generateFlags?.image !== false ? { imagePrompt: result.imagePrompt } : {}),
+            ...(generateFlags?.video !== false ? { videoPrompt: result.videoPrompt } : {}),
+          };
+        }
+      }
       completedCount++;
       onProgress?.(completedCount, shotsToGenerate.length, result);
       return result;
     });
 
     // 视频提示词推理需要把上一个分镜已生成的 videoPrompt 注入下一个分镜的 prev1Info（保证
-    // 空间编号、床位、人物站位等跨镜头一致）。loadAdjacentShots 是从 SQLite 读最新状态的，
-    // 因此只要前一个 generateAndSaveShotPrompt 的 updateShot 完成后再启动下一个，prev1
-    // 的 withPrompt 上下文就是真实的、刚生成的内容。
+    // 空间编号、床位、人物站位等跨镜头一致）。串行执行时会同步更新 sharedShotsSnapshot，
+    // 因此前一个分镜刚生成的 videoPrompt 会进入后一个分镜的 prev1Info。
     // → wantsVideo 时强制串行（concurrency=1）；纯图片批量保留 3 并发。
     const concurrency = wantsVideo ? 1 : 3;
     const settled = await runWithConcurrency(tasks, concurrency);
@@ -652,7 +682,7 @@ export class ShotPromptService {
     shot: Shot,
     stylePrefix: string = '',
     generateFlags?: { image?: boolean; video?: boolean },
-    options?: { force?: boolean },
+    options?: ShotPromptGenerationOptions,
     styleSnapshot?: StyleSnapshotLike,
     preloadedCharacters?: Character[],
   ): Promise<PromptGenerationResult> {
@@ -667,7 +697,7 @@ export class ShotPromptService {
         // 网格/故事板模式：imagePrompt 使用专用推理模板
         const needImage = options?.force || !shot.imagePrompt?.trim();
         imagePrompt = needImage
-          ? await this.generateSpecialImageShotPrompt(shot, characters, stylePrefix, styleSnapshot)
+          ? await this.generateSpecialImageShotPrompt(shot, characters, stylePrefix, styleSnapshot, options?.shotsSnapshot)
           : (workingShot.imagePrompt || '');
         const shotWithGridPrompt = { ...workingShot, imagePrompt };
         // videoPrompt 仍走原流程
@@ -991,6 +1021,28 @@ function buildStoryboardContinuityNotice(referenceBundle: ShotReferenceBundle): 
   }
 
   return lines.join('\n');
+}
+
+function ensureStoryboardContinuityInPrompt(
+  prompt: string,
+  referenceBundle: ShotReferenceBundle,
+): string {
+  const previous = referenceBundle.items.find(item => item.kind === 'previous-storyboard-anchor');
+  if (!previous || !prompt.trim()) return prompt;
+
+  const continuityValue = `${formatItemMentionForEditablePrompt(previous)}，继承上一分镜的场景结构、人物状态、光影色调、镜头语言和末态情绪，只推进当前剧情，不按第一镜重建`;
+  let next = prompt
+    .replace(/(连续性\s*[：:])\s*[^。\n]*(?:无上一故事板参考|无参考|第一镜建立|全新建立|角色首次登场)[^。\n]*/g, `$1${continuityValue}`)
+    .replace(/(上一故事板参考\s*[：:])\s*无[^。\n]*/g, `$1${continuityValue}`)
+    .replace(/继承上一故事板无参考[，,、\s]*按第一镜建立/g, continuityValue)
+    .replace(/无上一故事板参考/g, continuityValue)
+    .replace(/上一故事板无参考/g, continuityValue)
+    .replace(/按第一镜建立/g, '以上一故事板为连续性起点推进当前分镜');
+
+  if (!next.includes(previous.mentionToken)) {
+    next = `${next.trimEnd()}\n\n连续性：${continuityValue}。`;
+  }
+  return next;
 }
 
 export function rewriteProviderImageTokensToMentions(
@@ -1535,7 +1587,7 @@ export async function generateShotPrompt(
   stylePrefix?: string,
   llmSelection?: string,
   generateFlags?: { image?: boolean; video?: boolean },
-  options?: { force?: boolean },
+  options?: ShotPromptGenerationOptions,
   styleSnapshot?: StyleSnapshotLike,
 ): Promise<PromptGenerationResult> {
   const { createCreationContext } = await import('./CreationContext');
@@ -1592,7 +1644,7 @@ export async function batchGenerateShotPrompts(
   llmSelection?: string,
   styleSnapshot?: StyleSnapshotLike,
   generateFlags?: { image?: boolean; video?: boolean },
-  options?: { force?: boolean },
+  options?: ShotPromptGenerationOptions,
 ): Promise<PromptGenerationResult[]> {
   const { createCreationContext } = await import('./CreationContext');
   const ctx = await createCreationContext(projectId, episodeId, {

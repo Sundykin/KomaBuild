@@ -55,7 +55,7 @@ export function buildShotReferenceBundle(params: BuildParams): ShotReferenceBund
   // 1. 锚点：grid-anchor 或 shot-anchor，单选
   pushAnchor(normalized, items, seen);
 
-  // 1.5 故事板模式可选继承上一张故事板图。它不是当前镜头 primary anchor，
+  // 1.5 故事板模式可选继承上一张可用分镜图。它不是当前镜头 primary anchor，
   // 但要进同一 references 索引空间，供后续故事板保持人物/场景/光影连续。
   pushPreviousStoryboardAnchor(params, items, seen);
 
@@ -242,20 +242,27 @@ function pushPreviousStoryboardAnchor(params: BuildParams, items: ShotReferenceI
 
   for (let i = index - 1; i >= 0; i -= 1) {
     const previous = normalizeShotMediaState(allShots[i]);
-    if (previous.imageMode !== 'storyboard') continue;
-    const previousIndex = previous.media?.currentImageIndex ?? 0;
-    const candidate = previous.media?.images?.[previousIndex];
+    const candidate = pickSelectedShotImage(previous);
     if (!candidate || isGridSplitChild(candidate)) continue;
     pushItem(items, seen, {
       kind: 'previous-storyboard-anchor',
-      id: `${previous.id}#storyboard`,
-      label: '上一故事板锚点（用于剧情、场景、人物、光影连续性）',
+      id: `${previous.id}#selected-image`,
+      label: '上一故事板锚点（上一分镜选中图片，用于剧情、场景、人物、光影连续性）',
       source: candidate,
       mentionToken: '@previous_storyboard_anchor',
       priority: PRIORITY.PREVIOUS_STORYBOARD,
     });
     return;
   }
+}
+
+function pickSelectedShotImage(shot: Shot): StoredMediaAsset | undefined {
+  const images = shot.media?.images || [];
+  if (!images.length) return undefined;
+  const currentIndex = shot.media?.currentImageIndex ?? 0;
+  const selected = images[currentIndex];
+  if (selected && !isGridSplitChild(selected)) return selected;
+  return images.find(image => !isGridSplitChild(image));
 }
 
 /** 判断是否是九宫格拆分留下的子图（历史路径，新架构不参与）。 */

@@ -434,6 +434,41 @@ describe('shotVideoPlan', () => {
     expect(plan.primaryImageInput).toEqual(createImageAsset('https://cdn.example.com/storyboard.png'));
   });
 
+  it('storyboard 续上板只有上一分镜图片时，会把上一图作为参考生视频锚点', () => {
+    const previous = createShot({
+      id: 'shot-prev',
+      imageMode: 'normal',
+      media: {
+        images: [
+          createImageAsset('https://cdn.example.com/previous-v1.png'),
+          createImageAsset('https://cdn.example.com/previous-v2.png'),
+        ],
+        currentImageIndex: 1,
+      },
+    });
+    const current = createShot({
+      id: 'shot-current',
+      imageMode: 'storyboard',
+      videoMode: 'multi-ref',
+    });
+
+    const plan = collectShotVideoPlan({
+      shot: current,
+      allShots: [previous, current],
+      characters: [],
+      scenes: [],
+      props: [],
+      modelCapabilities: ['video.reference-to-video', 'video.image-to-video'],
+    });
+
+    expect(plan.capability).toBe('video.reference-to-video');
+    expect(plan.bundle.items[0].kind).toBe('previous-storyboard-anchor');
+    expect(plan.bundle.items[0].mentionToken).toBe('@previous_storyboard_anchor');
+    expect(plan.visualReferenceInputs).toEqual([
+      createImageAsset('https://cdn.example.com/previous-v2.png'),
+    ]);
+  });
+
   it('构建视频请求时保留上游按模型规格归一后的时长', () => {
     const plan = collectShotVideoPlan({
       shot: createShot(),

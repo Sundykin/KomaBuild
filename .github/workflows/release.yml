@@ -14,6 +14,10 @@ on:
 permissions:
   contents: write
 
+env:
+  ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+  npm_config_electron_mirror: https://npmmirror.com/mirrors/electron/
+
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -42,14 +46,19 @@ jobs:
       - name: Build Windows portable
         run: npm run build-we
 
+      - name: List Windows build outputs
+        run: find out -type f | sort
+        shell: bash
+
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows-artifacts
+          if-no-files-found: error
           path: |
-            out/*.exe
-            out/*.blockmap
-            out/latest*.yml
+            out/**/*.exe
+            out/**/*.blockmap
+            out/**/latest*.yml
 
   build-macos:
     runs-on: macos-latest
@@ -80,15 +89,19 @@ jobs:
       - name: Build macOS (ARM64)
         run: npm run build-m-arm64
 
+      - name: List macOS build outputs
+        run: find out -type f | sort
+
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
           name: macos-artifacts
+          if-no-files-found: error
           path: |
-            out/*.dmg
-            out/*.zip
-            out/*.blockmap
-            out/latest*.yml
+            out/**/*.dmg
+            out/**/*.zip
+            out/**/*.blockmap
+            out/**/latest*.yml
 
   build-linux:
     runs-on: ubuntu-latest
@@ -113,14 +126,18 @@ jobs:
       - name: Build Linux AppImage
         run: npm run build-l
 
+      - name: List Linux build outputs
+        run: find out -type f | sort
+
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
           name: linux-artifacts
+          if-no-files-found: error
           path: |
-            out/*.AppImage
-            out/*.blockmap
-            out/latest*.yml
+            out/**/*.AppImage
+            out/**/*.blockmap
+            out/**/latest*.yml
 
   sign-and-release:
     needs: [build-windows, build-macos, build-linux]

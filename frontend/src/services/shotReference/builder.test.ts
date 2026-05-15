@@ -393,6 +393,63 @@ describe('buildShotReferenceBundle — storyboard mode', () => {
     expect(bundle.items[0].source).toBe(previousV2);
   });
 
+  it('storyboard 模式续上板时继承上一条有图分镜，即使上一条不是 storyboard 模式', () => {
+    const previousV1 = asset('https://example.com/normal-prev-v1.png');
+    const previousV2 = asset('https://example.com/normal-prev-v2.png');
+    const previous = shotOf({
+      id: 'shot-prev',
+      imageMode: 'normal',
+      media: {
+        images: [previousV1, previousV2],
+        currentImageIndex: 1,
+      },
+    });
+    const current = shotOf({
+      id: 'shot-current',
+      imageMode: 'storyboard',
+    });
+
+    const bundle = buildShotReferenceBundle({
+      shot: current,
+      allShots: [previous, current],
+      characters: [],
+      scenes: [],
+      props: [],
+    });
+
+    expect(bundle.items[0].kind).toBe('previous-storyboard-anchor');
+    expect(bundle.items[0].mentionToken).toBe('@previous_storyboard_anchor');
+    expect(bundle.items[0].source).toBe(previousV2);
+  });
+
+  it('storyboard 模式续上板时若当前选中图是历史拆分子图，会回退到上一条可用整图', () => {
+    const previousGridCell = asset('https://example.com/grid-cell.png', { gridCell: 1 });
+    const previousWhole = asset('https://example.com/previous-whole.png');
+    const previous = shotOf({
+      id: 'shot-prev',
+      imageMode: 'grid',
+      media: {
+        images: [previousGridCell, previousWhole],
+        currentImageIndex: 0,
+      },
+    });
+    const current = shotOf({
+      id: 'shot-current',
+      imageMode: 'storyboard',
+    });
+
+    const bundle = buildShotReferenceBundle({
+      shot: current,
+      allShots: [previous, current],
+      characters: [],
+      scenes: [],
+      props: [],
+    });
+
+    expect(bundle.items[0].kind).toBe('previous-storyboard-anchor');
+    expect(bundle.items[0].source).toBe(previousWhole);
+  });
+
   it('storyboard 模式关闭继承时不加入上一故事板图', () => {
     const previous = shotOf({
       id: 'shot-prev',

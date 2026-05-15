@@ -240,7 +240,8 @@ function routeBundleToCapability(params: {
 function isAnchorItem(item: ShotReferenceItem): boolean {
   return item.kind === 'shot-anchor'
     || item.kind === 'grid-anchor'
-    || item.kind === 'storyboard-anchor';
+    || item.kind === 'storyboard-anchor'
+    || item.kind === 'previous-storyboard-anchor';
 }
 
 /**
