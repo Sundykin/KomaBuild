@@ -13,7 +13,7 @@
 - macOS / Windows / Linux 桌面环境（用于 Electron 调试）
 
 ```bash
-git clone https://github.com/Sundykin/KomaBuild.git Koma
+git clone https://github.com/M-JYuan/Koma.git
 cd Koma
 npm run install:all
 npm run dev

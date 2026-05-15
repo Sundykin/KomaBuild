@@ -3,16 +3,16 @@
  * update-plugin-registry.cjs
  *
  * 在插件发布流水线里运行：
- *   1. 拉 Sundykin/KomaBuild main 上的 plugin-registry.json
+ *   1. 拉 M-JYuan/Koma main 上的 plugin-registry.json
  *   2. 加/更新 当前插件条目（id, name, latestVersion, sha512, downloadUrl, engine 等）
  *   3. ed25519 重签整个注册表（用规范化 JSON）
- *   4. 把新 registry 写回 KomaBuild 的 main 分支
+ *   4. 把新 registry 写回 Koma 的 main 分支
  *
  * 调用方式：作为 GitHub Actions job 的最后一步运行。仓库已 actions/checkout 了
- * KomaBuild main 到本地路径 $REGISTRY_REPO_DIR。
+ * Koma main 到本地路径 $REGISTRY_REPO_DIR。
  *
  * 入参（环境变量）:
- *   REGISTRY_REPO_DIR     KomaBuild 仓库 checkout 路径（必填）
+ *   REGISTRY_REPO_DIR     Koma 仓库 checkout 路径（必填）
  *   PLUGIN_ID             插件 id（必填）
  *   PLUGIN_VERSION        插件版本（必填）
  *   PLUGIN_NAME           显示名（必填）

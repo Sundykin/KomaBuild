@@ -17,7 +17,7 @@ import {
 import { marketplaceStore } from './store';
 
 const RAW_URL =
-  'https://raw.githubusercontent.com/Sundykin/KomaBuild/main/plugin-registry.json';
+  'https://raw.githubusercontent.com/M-JYuan/Koma/main/plugin-registry.json';
 
 export interface FetchRegistryResult {
   ok: boolean;

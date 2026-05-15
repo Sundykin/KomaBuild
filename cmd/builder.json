@@ -40,8 +40,8 @@
   "publish": [
     {
       "provider": "github",
-      "owner": "Sundykin",
-      "repo": "KomaBuild",
+      "owner": "M-JYuan",
+      "repo": "Koma",
       "releaseType": "release"
     }
   ],

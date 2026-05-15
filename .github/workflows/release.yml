@@ -1,13 +1,13 @@
 name: Release (manual fallback)
 
-# 主发布流程在 Sundykin/KomaBuild 仓的 build.yml 里——它会 clone 本仓源码、打包、签名、发 release。
-# 这个 workflow 只作为"KomaBuild 流水线挂掉时的本地手动备用"，所以仅 workflow_dispatch 触发。
-# 平时不应被使用；如果意外双发了，KomaBuild 的版本号校验会把两份的 manifest 都验掉一份。
+# 主发布流程在 M-JYuan/Koma 仓的 build.yml 里——它会 clone 本仓源码、打包、签名、发 release。
+# 这个 workflow 只作为"Koma 流水线挂掉时的本地手动备用"，所以仅 workflow_dispatch 触发。
+# 平时不应被使用；如果意外双发了，Koma 的版本号校验会把两份的 manifest 都验掉一份。
 on:
   workflow_dispatch:
     inputs:
       reason:
-        description: 'Why bypassing KomaBuild build.yml? (for audit)'
+        description: 'Why bypassing Koma build.yml? (for audit)'
         required: true
         type: string
 
@@ -164,10 +164,10 @@ jobs:
           KOMA_UPDATE_SIGN_KEY: ${{ secrets.KOMA_UPDATE_SIGN_KEY }}
         run: node scripts/sign-update-manifest.cjs
 
-      - name: Create GitHub Release on Sundykin/KomaBuild
+      - name: Create GitHub Release on M-JYuan/Koma
         uses: softprops/action-gh-release@v2
         with:
-          repository: Sundykin/KomaBuild
+          repository: M-JYuan/Koma
           token: ${{ secrets.GH_TOKEN }}
           tag_name: ${{ github.ref_name }}
           draft: false

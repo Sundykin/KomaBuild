@@ -3,7 +3,7 @@ name: Release Plugin
 # 触发：plugin tag 形如 plugin-com.koma.style-pack-basic-1.0.2
 # 期望仓库结构（与本仓约定）：
 #   <repo>/plugins/<pluginId>/   含 manifest.json + plugin source
-# 流水线：build → sign → upload to KomaBuild release → update registry & push back
+# 流水线：build → sign → upload to Koma release → update registry & push back
 
 on:
   push:
@@ -60,11 +60,11 @@ jobs:
           KOMA_UPDATE_SIGN_KEY: ${{ secrets.KOMA_UPDATE_SIGN_KEY }}
         run: node scripts/sign-plugin-manifest.cjs --in "${{ steps.zip.outputs.path }}"
 
-      - name: Upload zip to KomaBuild release
+      - name: Upload zip to Koma release
         id: upload
         uses: softprops/action-gh-release@v2
         with:
-          repository: Sundykin/KomaBuild
+          repository: M-JYuan/Koma
           token: ${{ secrets.GH_TOKEN }}
           tag_name: ${{ steps.parse.outputs.tag }}
           name: ${{ steps.parse.outputs.tag }}
@@ -72,10 +72,10 @@ jobs:
           prerelease: false
           files: ${{ steps.zip.outputs.path }}
 
-      - name: Checkout KomaBuild main
+      - name: Checkout Koma main
         uses: actions/checkout@v4
         with:
-          repository: Sundykin/KomaBuild
+          repository: M-JYuan/Koma
           token: ${{ secrets.GH_TOKEN }}
           path: koma-build-repo
           ref: main
@@ -105,7 +105,7 @@ jobs:
           PLUGIN_NAME: ${{ steps.meta.outputs.name }}
           PLUGIN_CATEGORY: ${{ steps.meta.outputs.category }}
           PLUGIN_DESCRIPTION: ${{ steps.meta.outputs.description }}
-          PLUGIN_DOWNLOAD_URL: https://github.com/Sundykin/KomaBuild/releases/download/${{ steps.parse.outputs.tag }}/${{ steps.parse.outputs.plugin_id }}-${{ steps.parse.outputs.version }}.zip
+          PLUGIN_DOWNLOAD_URL: https://github.com/M-JYuan/Koma/releases/download/${{ steps.parse.outputs.tag }}/${{ steps.parse.outputs.plugin_id }}-${{ steps.parse.outputs.version }}.zip
           PLUGIN_ZIP_PATH: ${{ steps.zip.outputs.path }}
           PLUGIN_ENGINE_MIN: ${{ steps.meta.outputs.min }}
           PLUGIN_ENGINE_MAX: ${{ steps.meta.outputs.max }}

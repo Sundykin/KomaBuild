@@ -1,7 +1,7 @@
 /**
  * Updater feed URL 解析。
  *
- * 本期单源：GitHub Releases（Sundykin/KomaBuild）。
+ * 本期单源：GitHub Releases（M-JYuan/Koma）。
  * 留出 `resolveFeedURL()` 接口，未来加国内镜像时只改此函数（双源探测、HEAD 比较、failover）。
  *
  * manifest / 安装包 / blockmap 的最终下载 URL 均由 electron-updater 自己根据
@@ -17,8 +17,8 @@ export interface ResolvedFeed {
   manifestSigUrl: string;
 }
 
-const OWNER = 'Sundykin';
-const REPO = 'KomaBuild';
+const OWNER = 'M-JYuan';
+const REPO = 'Koma';
 
 export async function resolveFeed(): Promise<ResolvedFeed> {
   return {
