@@ -38,6 +38,8 @@ permissions:
 
 env:
   PRIVATE_REPO: git@github.com:Sundykin/Koma.git
+  ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+  npm_config_electron_mirror: https://npmmirror.com/mirrors/electron/
 
 jobs:
   prepare:
