@@ -7,7 +7,7 @@ import {
   sanitizeVideoPromptResult,
 } from './ShotPromptService';
 import type { ShotReferenceBundle } from './shotReference/types';
-import type { Character, Shot } from '../types';
+import type { Character, Shot, StoredMediaAsset } from '../types';
 import type { CreationContext } from './CreationContext';
 
 vi.mock('../store/projectStore', () => ({
@@ -45,6 +45,14 @@ function createStoryboardShot(partial?: Partial<Shot>): Shot {
     props: [],
     media: {},
     ...partial,
+  };
+}
+
+function createImageAsset(localPath: string): StoredMediaAsset {
+  return {
+    kind: 'image',
+    localPath,
+    createdAt: 1,
   };
 }
 
@@ -426,5 +434,140 @@ describe('ShotPromptService storyboard prompt variables', () => {
         storyboardConstraints: '镜头数量由剧情节奏决定 / 1 个角色 / 1 个场景',
       }),
     );
+  });
+
+  it('passes previous storyboard image reference into the storyboard template variables', async () => {
+    const { ShotPromptService } = await import('./ShotPromptService');
+    const projectStore = await import('../store/projectStore');
+    const promptTemplates = await import('../store/promptTemplates');
+
+    vi.mocked(projectStore.loadProject).mockResolvedValue({
+      id: 'project-1',
+      title: '叶赎修仙异闻录',
+      genre: '修仙玄幻',
+      mode: 'drama',
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    vi.mocked(projectStore.loadScenes).mockResolvedValue([{ id: 'scene_room', name: '叶赎居所' }] as any);
+    vi.mocked(projectStore.loadProps).mockResolvedValue([]);
+    vi.mocked(projectStore.loadEpisodeShots).mockResolvedValue([
+      createStoryboardShot({
+        id: 'shot-prev',
+        media: {
+          images: [createImageAsset('/tmp/prev-storyboard.png')],
+          currentImageIndex: 0,
+        },
+      }),
+      createStoryboardShot({ id: 'shot-current' }),
+    ]);
+
+    const service = new ShotPromptService(createContext());
+    await service.generateSpecialImageShotPrompt(
+      createStoryboardShot({ id: 'shot-current' }),
+      [{ id: 'char_yeshu', name: '叶赎', appearance: '青年修士' } as Character],
+      '修仙玄幻写实',
+    );
+
+    expect(promptTemplates.resolvePromptTemplate).toHaveBeenCalledWith(
+      'storyboard_shot_prompt_generation',
+      expect.objectContaining({
+        referenceTable: expect.stringContaining('@previous_storyboard_anchor'),
+        storyboardContinuityNotice: expect.stringContaining('@previous_storyboard_anchor'),
+      }),
+    );
+  });
+
+  it('uses the provided shots snapshot for previous storyboard references before reading stale storage', async () => {
+    const { ShotPromptService } = await import('./ShotPromptService');
+    const projectStore = await import('../store/projectStore');
+    const promptTemplates = await import('../store/promptTemplates');
+
+    vi.mocked(projectStore.loadProject).mockResolvedValue({
+      id: 'project-1',
+      title: '叶赎修仙异闻录',
+      genre: '修仙玄幻',
+      mode: 'drama',
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    vi.mocked(projectStore.loadScenes).mockResolvedValue([{ id: 'scene_room', name: '叶赎居所' }] as any);
+    vi.mocked(projectStore.loadProps).mockResolvedValue([]);
+    vi.mocked(projectStore.loadEpisodeShots).mockResolvedValue([]);
+
+    const previous = createStoryboardShot({
+      id: 'shot-prev',
+      media: {
+        images: [createImageAsset('/tmp/prev-storyboard.png')],
+        currentImageIndex: 0,
+      },
+    });
+    const current = createStoryboardShot({ id: 'shot-current' });
+    const service = new ShotPromptService(createContext());
+
+    await service.generateSpecialImageShotPrompt(
+      current,
+      [{ id: 'char_yeshu', name: '叶赎', appearance: '青年修士' } as Character],
+      '修仙玄幻写实',
+      undefined,
+      [previous, current],
+    );
+
+    expect(promptTemplates.resolvePromptTemplate).toHaveBeenCalledWith(
+      'storyboard_shot_prompt_generation',
+      expect.objectContaining({
+        referenceTable: expect.stringContaining('@previous_storyboard_anchor'),
+        storyboardContinuityNotice: expect.stringContaining('@previous_storyboard_anchor'),
+      }),
+    );
+  });
+
+  it('rewrites false no-previous storyboard continuity when a previous anchor exists', async () => {
+    const { ShotPromptService } = await import('./ShotPromptService');
+    const projectStore = await import('../store/projectStore');
+
+    vi.mocked(projectStore.loadProject).mockResolvedValue({
+      id: 'project-1',
+      title: '叶赎修仙异闻录',
+      genre: '修仙玄幻',
+      mode: 'drama',
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    vi.mocked(projectStore.loadScenes).mockResolvedValue([{ id: 'scene_room', name: '叶赎居所' }] as any);
+    vi.mocked(projectStore.loadProps).mockResolvedValue([]);
+    vi.mocked(projectStore.loadEpisodeShots).mockResolvedValue([]);
+
+    const previous = createStoryboardShot({
+      id: 'shot-prev',
+      media: {
+        images: [createImageAsset('/tmp/prev-storyboard.png')],
+        currentImageIndex: 0,
+      },
+    });
+    const current = createStoryboardShot({ id: 'shot-current' });
+    const chat = vi.fn(async () => [
+      '## 连续性：无上一故事板参考，按当前分镜建立起始状态。角色首次登场。',
+      '## 【场景设计区】：@scene_room 叶赎居所。继承上一故事板无参考，按第一镜建立。',
+    ].join('\n'));
+    const service = new ShotPromptService(createContext({
+      llmProvider: {
+        chat,
+        stream: vi.fn(),
+      } as unknown as CreationContext['llmProvider'],
+    }));
+
+    const result = await service.generateSpecialImageShotPrompt(
+      current,
+      [{ id: 'char_yeshu', name: '叶赎', appearance: '青年修士' } as Character],
+      '修仙玄幻写实',
+      undefined,
+      [previous, current],
+    );
+
+    expect(result).toContain('@previous_storyboard_anchor');
+    expect(result).not.toContain('无上一故事板参考');
+    expect(result).not.toContain('继承上一故事板无参考');
+    expect(result).not.toContain('按第一镜建立');
   });
 });

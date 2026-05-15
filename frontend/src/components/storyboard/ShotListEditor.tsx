@@ -430,21 +430,20 @@ function buildPreviousStoryboardMention(shots: Shot[], currentIndex: number): Me
 
   for (let i = currentIndex - 1; i >= 0; i -= 1) {
     const candidate = shots[i];
-    if (candidate.imageMode !== 'storyboard') continue;
     const images = candidate.media?.images || [];
     if (!images.length) continue;
     const rawIndex = candidate.media?.currentImageIndex;
     const selectedIndex = Number.isInteger(rawIndex)
       ? Math.min(Math.max(rawIndex as number, 0), images.length - 1)
       : 0;
-    const selectedImage = images[selectedIndex];
+    const selectedImage = images[selectedIndex] || images[0];
     const previewImage = getMediaAssetDisplaySource(selectedImage);
     if (!previewImage) continue;
     return {
       id: 'anchor',
       type: 'previous_storyboard',
       name: '上一故事板',
-      description: `来自分镜 #${i + 1} 的当前选中故事板版本 v${selectedIndex + 1}，用于保持剧情、人物、场景和光影连续。`,
+      description: `来自分镜 #${i + 1} 的当前选中图片版本 v${selectedIndex + 1}，用于保持剧情、人物、场景和光影连续。`,
       previewImage,
     };
   }

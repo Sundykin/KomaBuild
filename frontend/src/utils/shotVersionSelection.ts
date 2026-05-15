@@ -44,29 +44,42 @@ function ensureAssetSelected(
   return { assets: current, index: current.length - 1, changed: true };
 }
 
+function pickSelectedVersion(meta: ShotMeta): ShotMeta['versions'][number] | undefined {
+  return meta.versions.find(version => version.version === meta.currentVersion)
+    ?? [...meta.versions].sort((left, right) => {
+      const createdAtDiff = (right.createdAt || 0) - (left.createdAt || 0);
+      return createdAtDiff || right.version - left.version;
+    })[0];
+}
+
 export function syncShotSelectionFromVersionMeta(shot: Shot, meta?: ShotMeta): Shot {
   if (!meta?.versions?.length) return shot;
 
-  const selectedVersion = meta.versions.find(version => version.version === meta.currentVersion);
+  const selectedVersion = pickSelectedVersion(meta);
+  const selectedImage = selectedVersion?.media?.image;
   const selectedVideo = selectedVersion?.media?.video;
-  if (!selectedVersion || !selectedVideo) {
+  if (!selectedVersion || (!selectedImage && !selectedVideo)) {
     return {
       ...shot,
-      currentVersion: meta.currentVersion,
+      currentVersion: selectedVersion?.version ?? meta.currentVersion,
     };
   }
 
+  const imagesResult = ensureAssetSelected(shot.media?.images, selectedImage);
   const videosResult = ensureAssetSelected(shot.media?.videos, selectedVideo);
+  const currentImageIndex = imagesResult.index ?? shot.media?.currentImageIndex;
   const currentVideoIndex = videosResult.index ?? shot.media?.currentVideoIndex;
   const media = {
     ...(shot.media || {}),
+    ...(imagesResult.assets ? { images: imagesResult.assets } : {}),
     ...(videosResult.assets ? { videos: videosResult.assets } : {}),
+    ...(currentImageIndex !== undefined ? { currentImageIndex } : {}),
     ...(currentVideoIndex !== undefined ? { currentVideoIndex } : {}),
   };
 
   return {
     ...shot,
-    currentVersion: meta.currentVersion,
+    currentVersion: selectedVersion.version,
     media,
   };
 }
