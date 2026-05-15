@@ -213,7 +213,7 @@ describe('MediaGenerationService.generateVideo - ITV input policy matrix', () =>
         payload: {
           ...input.initialPayload,
           input: input.input,
-          output: { asset: { kind: 'video', localPath: '/tmp/recovered.mp4', createdAt: 1 } },
+          output: { kind: 'video', localPath: '/tmp/recovered.mp4', createdAt: 1 },
         },
         createdAt: 1,
         updatedAt: 1,
@@ -315,7 +315,7 @@ describe('MediaGenerationService.generateVideo - ITV input policy matrix', () =>
         payload: {
           ...input.initialPayload,
           input: input.input,
-          output: { asset: { kind: 'video', localPath: input.input.extra.destPath, createdAt: 1 } },
+          output: { kind: 'video', localPath: input.input.extra.destPath, createdAt: 1 },
         },
         createdAt: 1,
         updatedAt: 1,
@@ -391,4 +391,5 @@ describe('MediaGenerationService.generateVideo - ITV input policy matrix', () =>
 
     delete (window as any).electronAPI;
   });
+
 });

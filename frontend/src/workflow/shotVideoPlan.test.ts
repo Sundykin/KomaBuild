@@ -220,7 +220,7 @@ describe('shotVideoPlan', () => {
       primaryImage: referenceAsset,
       additionalReferences: [],
       options: {
-        duration: 6,
+        duration: 4,
         motionPrompt: undefined,
         aspectRatio: '16:9',
       },
@@ -260,7 +260,7 @@ describe('shotVideoPlan', () => {
       capability: 'video.text-to-video',
       prompt: '展示道具细节',
       options: {
-        duration: 6,
+        duration: 4,
         motionPrompt: undefined,
         aspectRatio: '1:1',
       },
@@ -434,7 +434,7 @@ describe('shotVideoPlan', () => {
     expect(plan.primaryImageInput).toEqual(createImageAsset('https://cdn.example.com/storyboard.png'));
   });
 
-  it('构建视频请求时会把任意时长归一到允许档位', () => {
+  it('构建视频请求时保留上游按模型规格归一后的时长', () => {
     const plan = collectShotVideoPlan({
       shot: createShot(),
       characters: [],
@@ -447,14 +447,14 @@ describe('shotVideoPlan', () => {
       prompt: '短镜头',
       duration: 4,
       aspectRatio: '16:9',
-    }).options?.duration).toBe(6);
+    }).options?.duration).toBe(4);
 
     expect(buildShotVideoRequest({
       plan,
       prompt: '长镜头',
       duration: 18,
       aspectRatio: '16:9',
-    }).options?.duration).toBe(20);
+    }).options?.duration).toBe(18);
   });
 
   it('能力支持检查会按当前项目选择直接校验，不再回退到其他模型', () => {

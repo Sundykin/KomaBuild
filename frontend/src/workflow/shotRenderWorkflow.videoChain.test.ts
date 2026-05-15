@@ -383,6 +383,61 @@ describe('shotRenderWorkflow video chain', () => {
     );
   });
 
+  it('seedance 分镜渲染使用当前模型时长范围，不把 8 秒吸附成 10 秒', async () => {
+    const { shotRenderWorkflow } = await import('./shotRenderWorkflow');
+    const { mediaGenerationService } = await import('../services/MediaGenerationService');
+    const projectStore = await import('../store/projectStore');
+
+    const shotImage = createImageAsset('https://cdn.example.com/shot.png');
+
+    vi.mocked(projectStore.loadCharacters).mockResolvedValue([]);
+    vi.mocked(projectStore.loadProps).mockResolvedValue([]);
+    vi.mocked(projectStore.loadScenes).mockResolvedValue([]);
+    vi.mocked(projectStore.saveShotVersion).mockResolvedValue({
+      version: 1,
+      prompt: '已有视频提示词',
+      seed: 1,
+      createdAt: 1,
+      model: 'test-model',
+      media: {},
+    } as any);
+    vi.mocked(projectStore.loadShotMeta).mockResolvedValue({
+      versions: [{ version: 1 }],
+    } as any);
+    vi.mocked(mediaGenerationService.generateVideo).mockResolvedValue({
+      kind: 'video',
+      localPath: '/tmp/shot.mp4',
+      providerTaskId: 'task-shot-1',
+      createdAt: 1,
+    } as any);
+
+    const result = await shotRenderWorkflow(
+      {
+        projectId: 'project-1',
+        shot: createShot({
+          duration: 8,
+          media: {
+            images: [shotImage],
+            currentImageIndex: 0,
+          },
+        }),
+        settings: createSeedanceSettings(),
+        mediaSelections: { itvSelection: 'seedance-main::seedance-2.0-r-full' },
+        styleSnapshot: { ttiStylePrefix: '电影级风格' },
+      },
+      () => {},
+    );
+
+    expect(result.success).toBe(true);
+    expect(mediaGenerationService.generateVideo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        request: expect.objectContaining({
+          options: expect.objectContaining({ duration: 8 }),
+        }),
+      }),
+    );
+  });
+
   it('分镜视频链路遇到项目选择不兼容时会直接报错，不再回退到其他模型', async () => {
     const { shotRenderWorkflow } = await import('./shotRenderWorkflow');
     const { mediaGenerationService } = await import('../services/MediaGenerationService');

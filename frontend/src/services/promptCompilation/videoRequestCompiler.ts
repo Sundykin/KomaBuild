@@ -10,7 +10,7 @@ import { resolveProviderAssetInput } from '../mediaAssetResolver';
 import { compileGrokITV, compileGrokTTI } from './grokImageIndexCompiler';
 import { compilePromptReferences } from './promptReferenceCompiler';
 import type { PromptCompilationDebug, PromptCompilationInput } from './types';
-import { normalizeVideoDurationSeconds } from '../../utils/videoDuration';
+import { DEFAULT_VIDEO_DURATION_SECONDS } from '../../utils/videoDuration';
 import { clampDurationToSpec, type VideoDurationSpec } from '../../providers/itv/durationSpec';
 
 type VideoRequestAsset = MediaAssetSource | ProviderAssetInput;
@@ -152,6 +152,11 @@ function toPositiveInt(value: unknown): number | undefined {
     }
   }
   return undefined;
+}
+
+function coerceVideoDurationOption(value: unknown): number {
+  const parsed = toPositiveInt(value);
+  return parsed ?? DEFAULT_VIDEO_DURATION_SECONDS;
 }
 
 async function ensureProviderAssetInput(
@@ -315,7 +320,7 @@ function normalizeVideoRequestOptions(
     ...options,
     duration: durationSpec
       ? clampDurationToSpec(options.duration, durationSpec)
-      : normalizeVideoDurationSeconds(options.duration),
+      : coerceVideoDurationOption(options.duration),
   };
 }
 

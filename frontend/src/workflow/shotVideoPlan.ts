@@ -11,7 +11,7 @@ import type {
   VideoGenerationCapability,
 } from '../types';
 import { getMediaAssetDisplaySource } from '../types';
-import { normalizeVideoDurationSeconds } from '../utils/videoDuration';
+import { DEFAULT_VIDEO_DURATION_SECONDS } from '../utils/videoDuration';
 import type { ModelCapability } from '../providers/channel/types';
 import { buildVideoCapabilityRequest } from '../services/promptCompilation/videoRequestCompiler';
 import { normalizeShotMediaState } from '../store/project/mediaState';
@@ -255,6 +255,17 @@ function pickAdditionalSources(items: ShotReferenceItem[], knowsModelCaps: boole
   return filtered.map(item => item.source);
 }
 
+function coerceShotVideoRequestDuration(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return Math.max(1, Math.round(value));
+  }
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed > 0) return Math.max(1, Math.round(parsed));
+  }
+  return DEFAULT_VIDEO_DURATION_SECONDS;
+}
+
 export function buildShotVideoRequest(params: {
   plan: ShotVideoPlan;
   prompt: string;
@@ -265,7 +276,7 @@ export function buildShotVideoRequest(params: {
 }): ITVRequest<MediaAssetSource> {
   const capability = params.capability || params.plan.capability;
   const options = {
-    duration: normalizeVideoDurationSeconds(params.duration),
+    duration: coerceShotVideoRequestDuration(params.duration),
     motionPrompt: params.motionPrompt,
     aspectRatio: params.aspectRatio,
   };
