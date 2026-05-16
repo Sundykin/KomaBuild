@@ -118,7 +118,7 @@ export const LLMConfigManager: React.FC<LLMConfigManagerProps> = ({ onConfigChan
     loadConfigs,
   } = useMediaConfigManager<LLMModelConfig>('llm', loadBuiltins, onConfigChange);
 
-  const showChannelConfigCreateEntry = import.meta.env.DEV;
+  const showChannelConfigCreateEntry = false;
   const watchedProviderType = Form.useWatch('providerType', form) as string | undefined;
   const isEditingActivationChannel = isKomaActivationManagedChannel(editingChannel);
   const currentProviderType = isEditingActivationChannel ? editingChannel?.providerType : watchedProviderType;

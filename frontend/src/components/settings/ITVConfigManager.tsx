@@ -152,7 +152,7 @@ export const ITVConfigManager: React.FC<ITVConfigManagerProps> = ({ onConfigChan
     handlePluginConfigSaved,
   } = useMediaConfigManager<ITVModelConfig>('itv', loadBuiltins, onConfigChange);
 
-  const showChannelConfigCreateEntry = import.meta.env.DEV;
+  const showChannelConfigCreateEntry = false;
   const watchedProviderType = Form.useWatch('providerType', form) as string | undefined;
   const isEditingActivationChannel = isKomaActivationManagedChannel(editingChannel);
   const currentProviderType = isEditingActivationChannel ? editingChannel?.providerType : watchedProviderType;
