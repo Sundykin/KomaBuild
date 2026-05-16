@@ -110,6 +110,8 @@ export const TTSConfigManager: React.FC<TTSConfigManagerProps> = ({ onConfigChan
     loadConfigs,
   } = useMediaConfigManager<TTSModelConfig>('tts', loadBuiltins, onConfigChange);
 
+  const showChannelConfigCreateEntry = false;
+
   const currentProviderType = Form.useWatch('providerType', form) as string | undefined;
   const editingHasStoredApiKey = Boolean(editingChannel && (editingChannel.providerConfig as Record<string, unknown> | undefined)?.hasApiKey);
   const watchedModels = Form.useWatch('models', form) as Array<Partial<ChannelModelDefinition>> | undefined;
@@ -341,9 +343,11 @@ export const TTSConfigManager: React.FC<TTSConfigManagerProps> = ({ onConfigChan
             {t('settings.ttsConfigured', { count: configs.length })}
           </span>
         </div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>
-          {t('settings.addConfig')}
-        </Button>
+        {showChannelConfigCreateEntry && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>
+            {t('settings.addConfig')}
+          </Button>
+        )}
       </div>
 
       {loading ? (
@@ -356,9 +360,11 @@ export const TTSConfigManager: React.FC<TTSConfigManagerProps> = ({ onConfigChan
           description={t('settings.noTTSConfigs')}
           className="settings-empty-state"
         >
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>
-            {t('settings.addFirstConfig')}
-          </Button>
+          {showChannelConfigCreateEntry && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>
+              {t('settings.addFirstConfig')}
+            </Button>
+          )}
         </Empty>
       ) : (
         <Row gutter={[12, 12]}>

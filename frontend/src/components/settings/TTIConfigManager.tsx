@@ -138,7 +138,7 @@ export const TTIConfigManager: React.FC<TTIConfigManagerProps> = ({ onConfigChan
     handlePluginConfigSaved,
   } = useMediaConfigManager<TTIModelConfig>('tti', loadBuiltins, onConfigChange);
 
-  const showChannelConfigCreateEntry = import.meta.env.DEV;
+  const showChannelConfigCreateEntry = false;
   const watchedProviderType = Form.useWatch('providerType', form) as string | undefined;
   const isEditingActivationChannel = isKomaActivationManagedChannel(editingChannel);
   const currentProviderType = isEditingActivationChannel ? editingChannel?.providerType : watchedProviderType;
