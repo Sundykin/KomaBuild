@@ -1,7 +1,25 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# 这是 Sundykin/KomaBuild 仓 .github/workflows/build.yml 的新版本。
+# 操作：去 https://github.com/Sundykin/KomaBuild/edit/main/.github/workflows/build.yml
+#       把现有内容整段替换为下方"=== BEGIN ===" 到 "=== END ===" 之间的内容（不含两行标记），
+#       提交到 main 即可。
+#
+# 与旧版差异（共 5 处，逐项标注 [CHANGED]）：
+#   1. 删 push tag 触发，只留 workflow_dispatch（避免误发）
+#   2. build-windows / build-macos upload-artifact 加 latest*.yml
+#   3. 新增 build-linux job
+#   4. release job 增加 clone 源码 + 跑签名脚本两步
+#   5. release 由 draft:true 改为 draft:false
+#
+# 需要的 secrets（在 KomaBuild 仓 Settings → Secrets and variables → Actions）：
+#   - SOURCE_REPO_DEPLOY_KEY  已存在
+#   - KOMA_UPDATE_SIGN_KEY    新增；值见 docs/release/SETUP.md
+# ─────────────────────────────────────────────────────────────────────────────
+
+# === BEGIN ===
 name: Build & Release
 
-# 手动触发：在 Actions 页面填 version (e.g. v1.0.0) + source_ref (默认 main)
-# 流水线会 checkout 本仓 → npm install → 三平台打包 → 签名 → 发 Release
+# [CHANGED #1] 删 push: tags: v*；只保留手动触发，避免误发
 on:
   workflow_dispatch:
     inputs:
@@ -17,6 +35,11 @@ on:
 
 permissions:
   contents: write
+
+env:
+  PRIVATE_REPO: git@github.com:Sundykin/Koma.git
+  ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+  npm_config_electron_mirror: https://npmmirror.com/mirrors/electron/
 
 jobs:
   prepare:
@@ -41,13 +64,18 @@ jobs:
     needs: [prepare]
     runs-on: windows-latest
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
+      - name: Configure SSH deploy key
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          ref: ${{ needs.prepare.outputs.source_ref }}
+          ssh-private-key: ${{ secrets.SOURCE_REPO_DEPLOY_KEY }}
+
+      - name: Clone private source
+        run: git clone --depth 1 --branch ${{ needs.prepare.outputs.source_ref }} ${{ env.PRIVATE_REPO }} source
+        shell: bash
 
       - name: Inject version into source
         run: |
+          cd source
           npm version ${{ needs.prepare.outputs.semver }} --no-git-tag-version --allow-same-version
           cd frontend
           npm version ${{ needs.prepare.outputs.semver }} --no-git-tag-version --allow-same-version
@@ -59,42 +87,55 @@ jobs:
           node-version: 22
 
       - name: Remove China mirror config
-        run: del .npmrc
+        run: del source\.npmrc
         shell: cmd
 
       - name: Install dependencies
         run: npm run install:all
+        working-directory: source
 
       - name: Build application
         run: npm run build
+        working-directory: source
 
       - name: Build Windows NSIS installer
         run: npm run build-w
+        working-directory: source
 
       - name: Build Windows portable
         run: npm run build-we
+        working-directory: source
 
+      - name: List Windows build outputs
+        run: find source/out -type f | sort
+        shell: bash
+
+      # [CHANGED #2] 把 latest*.yml 也带上 —— electron-updater 客户端需要这个文件
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows-artifacts
           if-no-files-found: error
           path: |
-            out/*.exe
-            out/*.blockmap
-            out/latest*.yml
+            source/out/**/*.exe
+            source/out/**/*.blockmap
+            source/out/**/latest*.yml
 
   build-macos:
     needs: [prepare]
     runs-on: macos-latest
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
+      - name: Configure SSH deploy key
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          ref: ${{ needs.prepare.outputs.source_ref }}
+          ssh-private-key: ${{ secrets.SOURCE_REPO_DEPLOY_KEY }}
+
+      - name: Clone private source
+        run: git clone --depth 1 --branch ${{ needs.prepare.outputs.source_ref }} ${{ env.PRIVATE_REPO }} source
 
       - name: Inject version into source
         run: |
+          cd source
           npm version ${{ needs.prepare.outputs.semver }} --no-git-tag-version --allow-same-version
           cd frontend
           npm version ${{ needs.prepare.outputs.semver }} --no-git-tag-version --allow-same-version
@@ -105,45 +146,59 @@ jobs:
           node-version: 22
 
       - name: Remove China mirror config
-        run: rm -f .npmrc
+        run: rm -f source/.npmrc
 
       - name: Install dependencies
         run: npm run install:all
+        working-directory: source
 
       - name: Install dmg-license
         run: npm install dmg-license
+        working-directory: source
 
       - name: Build application
         run: npm run build
+        working-directory: source
 
       - name: Build macOS (x64)
         run: npm run build-m
+        working-directory: source
 
       - name: Build macOS (ARM64)
         run: npm run build-m-arm64
+        working-directory: source
 
+      - name: List macOS build outputs
+        run: find source/out -type f | sort
+
+      # [CHANGED #2] 同上：把 latest*.yml 也带上
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
           name: macos-artifacts
           if-no-files-found: error
           path: |
-            out/*.dmg
-            out/*.zip
-            out/*.blockmap
-            out/latest*.yml
+            source/out/**/*.dmg
+            source/out/**/*.zip
+            source/out/**/*.blockmap
+            source/out/**/latest*.yml
 
+  # [CHANGED #3] 新增：Linux AppImage（cmd/builder-linux.json 已改为 target: ["AppImage"]）
   build-linux:
     needs: [prepare]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
+      - name: Configure SSH deploy key
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          ref: ${{ needs.prepare.outputs.source_ref }}
+          ssh-private-key: ${{ secrets.SOURCE_REPO_DEPLOY_KEY }}
+
+      - name: Clone private source
+        run: git clone --depth 1 --branch ${{ needs.prepare.outputs.source_ref }} ${{ env.PRIVATE_REPO }} source
 
       - name: Inject version into source
         run: |
+          cd source
           npm version ${{ needs.prepare.outputs.semver }} --no-git-tag-version --allow-same-version
           cd frontend
           npm version ${{ needs.prepare.outputs.semver }} --no-git-tag-version --allow-same-version
@@ -154,16 +209,19 @@ jobs:
           node-version: 22
 
       - name: Remove China mirror config
-        run: rm -f .npmrc
+        run: rm -f source/.npmrc
 
       - name: Install dependencies
         run: npm run install:all
+        working-directory: source
 
       - name: Build application
         run: npm run build
+        working-directory: source
 
       - name: Build Linux AppImage
         run: npm run build-l
+        working-directory: source
 
       - name: List Linux build outputs
         run: find source/out -type f | sort
@@ -174,19 +232,24 @@ jobs:
           name: linux-artifacts
           if-no-files-found: error
           path: |
-            out/*.AppImage
-            out/*.blockmap
-            out/latest*.yml
+            source/out/**/*.AppImage
+            source/out/**/*.blockmap
+            source/out/**/latest*.yml
 
   release:
+    # [CHANGED #3] needs 加上 build-linux
     needs: [prepare, build-windows, build-macos, build-linux]
     runs-on: ubuntu-latest
     steps:
-      # 只需要 checkout 拿签名脚本（纯 Node 标准库，无依赖）
-      - name: Checkout source
-        uses: actions/checkout@v4
+      # [CHANGED #4] release job 也要拉源码，但只为了拿签名脚本（scripts/sign-update-manifest.cjs）
+      # 不跑 npm install，不依赖任何 node_modules
+      - name: Configure SSH deploy key
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          ref: ${{ needs.prepare.outputs.source_ref }}
+          ssh-private-key: ${{ secrets.SOURCE_REPO_DEPLOY_KEY }}
+
+      - name: Clone private source (for sign script)
+        run: git clone --depth 1 --branch ${{ needs.prepare.outputs.source_ref }} ${{ env.PRIVATE_REPO }} source
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -205,6 +268,7 @@ jobs:
           name: macos-artifacts
           path: artifacts
 
+      # [CHANGED #3] 下载 linux 产物
       - name: Download Linux artifacts
         uses: actions/download-artifact@v4
         with:
@@ -214,15 +278,17 @@ jobs:
       - name: List release files
         run: find artifacts -type f | sort
 
-      # 签名脚本生成 koma-update-manifest.json + .sig（ed25519，纯 Node 标准库）
+      # [CHANGED #4] 跑签名脚本：生成 koma-update-manifest.json + .sig
+      # 脚本是纯 Node 标准库实现，无 npm 依赖
       - name: Sign update manifest (ed25519)
         env:
           ASSETS_DIR: ${{ github.workspace }}/artifacts
           APP_VERSION: ${{ needs.prepare.outputs.semver }}
           CHANNEL: stable
           KOMA_UPDATE_SIGN_KEY: ${{ secrets.KOMA_UPDATE_SIGN_KEY }}
-        run: node scripts/sign-update-manifest.cjs
+        run: node source/scripts/sign-update-manifest.cjs
 
+      # [CHANGED #5] draft 改为 false —— electron-updater 不能读 draft release
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -235,3 +301,4 @@ jobs:
 
             Built from source ref: `${{ needs.prepare.outputs.source_ref }}`
           files: artifacts/*
+# === END ===
